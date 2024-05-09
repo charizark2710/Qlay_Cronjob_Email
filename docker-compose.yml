@@ -1,0 +1,68 @@
+version: '3.1'
+
+services:
+  mail:
+    container_name: Mail_Server
+    env_file:
+      - .env
+    build:
+      context: ./Mail_Server
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      
+    volumes:
+      - './Mail_Server:/srv/www/volume_Mail_Server'
+    networks:
+      test:
+        aliases:
+          - QLAY
+
+  cron:
+    container_name: Cron_Server
+    env_file:
+      - .env
+    build:
+      context: ./Cron_Server
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - './Cron_Server:/srv/www/volume_Cron_Server'
+    networks:
+      test:
+        aliases:
+          - QLAY
+
+
+  rabbitmq:
+    container_name: "rabbitmq"
+    restart: unless-stopped
+    # command: tail -F /dev/null
+    build:
+      context: ./AMQP_Server
+      dockerfile: Broker.Dockerfile
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=/var/lib/rabbitmq/.erlang.cookie
+      - RABBITMQ_CONFIG_FILES=/etc/rabbitmq/rabbitmq.conf
+      - RABBITMQ_MNESIA_BASE=/data/mnesia
+      - RABBITMQ_LOG_BASE=/data/log
+      - RABBITMQ_ENABLED_PLUGINS_FILE=/etc/rabbitmq/enabled_plugins
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      test:
+        aliases:
+          - QLAY
+  
+networks:
+  test:
+    driver: bridge
